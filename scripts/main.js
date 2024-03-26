@@ -101,7 +101,7 @@ function writeHikes() {
 function displayCardsDynamically(collection) {
   let cardTemplate = document.getElementById("hikeCardTemplate"); // Retrieve the HTML element with the ID "hikeCardTemplate" and store it in the cardTemplate variable. 
 
-  db.collection(collection).get()   //the collection called "hikes"
+  db.collection(collection).limit(2).get()   //the collection called "hikes"
     .then(allHikes => {
       //var i = 1;  //Optional: if you want to have a unique ID for each hike
       allHikes.forEach(doc => { //iterate thru each doc
@@ -121,7 +121,7 @@ function displayCardsDynamically(collection) {
         newcard.querySelector('.card-text').innerHTML = details;
         newcard.querySelector('.card-image').src = `./images/${hikeCode}.jpg`; //Example: NV01.jpg
         newcard.querySelector('a').href = "eachHike.html?docID=" + docID;
-        newcard.querySelector('i').onclick = () => saveBookmark(docID); // Save bookmark when the bookmark icon is clicked
+        newcard.querySelector('i').onclick = () => updateBookmark(docID); // Save bookmark when the bookmark icon is clicked
         newcard.querySelector('i').id = "save-" + docID; // Give the bookmark icon a unique ID
 
         currentUser.get().then(userDoc => {
@@ -150,22 +150,34 @@ function displayCardsDynamically(collection) {
 // It adds the hike to the "bookmarks" array
 // Then it will change the bookmark icon from the hollow to the solid version. 
 //-----------------------------------------------------------------------------
-function saveBookmark(hikeDocID) {
-  // Manage the backend process to store the hikeDocID in the database, recording which hike was bookmarked by the user.
-  currentUser.update({
-    // Use 'arrayUnion' to add the new bookmark ID to the 'bookmarks' array.
-    // This method ensures that the ID is added only if it's not already present, preventing duplicates.
-    bookmarks: firebase.firestore.FieldValue.arrayUnion(hikeDocID)
+function updateBookmark(hikeID) {
+  //check if this hike ID has been bookmarked or not
+  //1. get this list of the bookmarks for the current user in the database
+  currentUser.get().then((userDoc) => {
+    let bookmarksNow = userDoc.data().bookmarks;
+    console.log(bookmarksNow);
+
+    if (bookmarksNow.includes(hikeID)) {
+      //if the hike is already bookmarked, remove it from the bookmarks array
+      console.log("this hikeID exists in the dababase, should be removed")
+      return currentUser.update({
+        bookmarks: firebase.firestore.FieldValue.arrayRemove(hikeID)
+      }).then(() => {
+        let iconID = 'save-' + hikeID;
+        document.getElementById(iconID).innerText = 'bookmark';
+      });
+
+    } else {
+      return currentUser.update({
+        bookmarks: firebase.firestore.FieldValue.arrayUnion(hikeID)
+      })
+        //if the hike is not bookmarked, add it to the bookmarks array
+        .then(() => {
+          let iconID = 'save-' + hikeID;
+          document.getElementById(iconID).innerText = 'bookmark';
+        });
+    }
+
   })
-    // Handle the front-end update to change the icon, providing visual feedback to the user that it has been clicked.
-    .then(function () {
-      console.log("bookmark has been saved for" + hikeDocID);
-      let iconID = 'save-' + hikeDocID;
-      //console.log(iconID);
-      //this is to change the icon of the hike that was saved to "filled"
-      document.getElementById(iconID).innerText = 'bookmark';
-    });
-  // This function is called whenever the user clicks on the "bookmark" icon.
-  // It adds or removes the hike from the "bookmarks" array
-  // Then it will change the bookmark icon from the hollow to the solid version or vice versa.
-}
+
+} 
